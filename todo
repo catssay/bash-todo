@@ -2,22 +2,19 @@
 
 todo_folder="${HOME}/.todo"
 todo_file="${todo_folder}/`date +%Y-%m-%d`.txt"
-tmp_file="/tmp/todo_todo"
 todo_flag=' '
 done_flag='+'
 
 command_name="$1"
-command_params=""
 date_params=""
 if [ -n "$command_name" ]; then
     shift 1
 fi
-
 while getopts ":d:" opt; do
     case $opt in
 	d )
 	    date_params=$(date -d "$OPTARG" +%Y-%m-%d)
-	    if [ -n "$temp_todo_file" ]; then
+	    if [ -n "$date_params" ]; then
 		todo_file=""${todo_folder}/${date_params}.txt""
 	    fi
 	    ;;
@@ -25,36 +22,25 @@ while getopts ":d:" opt; do
 done
 shift $(($OPTIND - 1))
 command_params="${@#$0}"
-echo $command_name
-echo $command_params
-echo $date_params
-echo $todo_file
 
 usage () {
-    echo -en "  Usage: $0 "
-    echo_bold "add "
-    echo_underline  "CONTENT"
-    echo -n " | "
-    echo_bold "ls"
-    echo -n " | "
-    echo_bold "rm "
-    echo_underline "N"
-    echo -n " | "
-    echo_bold "mark "
-    echo_underline "N"
-    echo -n " | "
-    echo_bold "unmark "
-    echo_underline "N"
-    echo
-    exit 0
-}
+    cat <<EOF | xargs -I{} echo -e {}
+Usage: $0 [COMMAND]
+COMMANDS:
+\\\\t add    | a   [ OPTIONS ] \\\e[4mCONTENT\\\e[0m  add CONTENT to todo list.
+\\\\t list   | ls  [ \\\e[4mDATE\\\e[0m ]             show DATE\'s todo list, default DATE is today.
+\\\\t remove | rm  [ \\\e[4mN\\\e[0m ]                remove todo item of line N, default is all lines.
+\\\\t mark   | m   [ \\\e[4mN\\\e[0m ]                mark todo item of line N as completed, default is all lines.
+\\\\t unmark | um  [ \\\e[4mN\\\e[0m ]                mark todo itemof line N as uncompleted. default is all lines.
 
-echo_underline () {
-    echo -en "\e[4m${@}\e[0m"
-}
-
-echo_bold () {
-    echo -en "\e[1m${@}\e[0m"
+OPTIONS:
+\\\\t -d  \\\e[4m DATE \\\e[0m  which day to be operated, default is today.
+DESCRIPTION:
+\\\\t \\\e[4mDATE\\\e[0m               DATE is like '"'today'"' '"'tomorrow'"' '"'last 2 days'"' '"'2017-11-11'"' etc,
+\\\\t """"""     """"""""              which can be recognized be GNU date program.
+\\\\t \\\e[4mN\\\e[0m                  N is a positive number.
+\\\\\n
+EOF
 }
 
 get_todo_folder () {
@@ -76,18 +62,16 @@ get_line_number () {
 
 ls_item () {
     local target_file="$todo_file"
-    
     if [ -z "$date_params" ]; then
 	if [ -n "$command_params" ]; then
 	    target_file="$todo_folder/$(date -d "$command_params" +%Y-%m-%d).txt"
 	fi
     fi
-
     if [ -f "$target_file" ]; then
-	if [ -z "$(cat $todo_file)" ]; then
+	if [ -z "$(cat $target_file)" ]; then
 	    exit 0
 	fi
-	cat "$todo_file" | awk -- " \
+	cat "$target_file" | awk -- " \
 { \
 if (\$1 == \"${done_flag}\")
   print \"\\033[92m\", NR, \$0, \"\\033[0m\" ;\
@@ -110,25 +94,43 @@ add_item () {
 op_item () {
     get_todo_file
     local line_number=$(get_line_number)
-    if [ -n "$line_number" ]; then
-	local content
-	case "$1" in 
-	    mark )
-		content=$(sed -r "${line_number}s/^${todo_flag}/${done_flag}/" $todo_file)
-		;;
-	    rm )
-		content=$(sed "${line_number}d" $todo_file)
-		;;
-	    unmark )
-		content=$(sed -r "${line_number}s/^\\${done_flag}/${todo_flag}/" $todo_file)
-		;;
-	    * )
-		usage
-	esac
-	echo -e "$content" > "$todo_file"
-	ls_item
+    if [ -z "$command_params" ]; then
+	line_number=""
     else
-	usage
+	if [ -z "$line_number" ]; then
+	    usage
+	fi
+    fi
+    local content
+    case "$1" in
+	mark )
+	    content=$(sed -r "${line_number}s/^${todo_flag}/${done_flag}/" $todo_file)
+	    ;;
+	rm )
+	    content=$(sed "${line_number}d" $todo_file)
+	    ;;
+	unmark )
+	    content=$(sed -r "${line_number}s/^\\${done_flag}/${todo_flag}/" $todo_file)
+	    ;;
+	* )
+	    usage
+    esac
+    if [ -z "$line_number" ]; then
+	ls_item
+	echo -ne "Are you really want to $1 all todo items ? [Y, N]: "
+	local choice_action
+	read choice_action
+	case "$choice_action" in
+	    Y | y | Yes | YES | yes )
+		echo -e "$content" > "$todo_file"
+		ls_item
+		;;
+	    N | n | No | NO | * )
+		exit 0
+		;;
+	esac
+    else
+	echo -e "$content" > "$todo_file"
     fi
 }
 
