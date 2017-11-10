@@ -126,19 +126,19 @@ if [ -z "$command_name" ]; then
 fi
 
 case "$command_name" in
-    add )
+    a | add )
 	add_item
 	;;
-    ls )
+    ls | list)
 	ls_item
 	;;
-    rm )
+    rm | remove)
 	op_item rm
 	;;
-    mark )
+    m | mark )
 	op_item mark
 	;;
-    unmark )
+    um | unmark )
 	op_item unmark
 	;;
     * )
