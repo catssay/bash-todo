@@ -7,7 +7,9 @@ todo_flag=' '
 done_flag='+'
 
 command_name="$1"
-shift 1
+if [ -n "$command_name" ]; then
+    shift 1
+fi
 command_params="${@#$0}"
 
 usage () {
@@ -64,6 +66,9 @@ get_line_number () {
 
 ls_item () {
     if [ -f "$todo_file" ]; then
+	if [ -z "$(cat $todo_file)" ]; then
+	    exit 0
+	fi
 	cat "$todo_file" | awk -- " \
 { \
 if (\$1 == \"${done_flag}\")
@@ -108,6 +113,11 @@ op_item () {
 	usage
     fi
 }
+
+if [ -z "$command_name" ]; then
+    ls_item
+    exit 0
+fi
 
 case "$command_name" in
     add )
