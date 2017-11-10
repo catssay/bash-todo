@@ -89,7 +89,7 @@ else \
 add_item () {
     get_todo_file
     if [ -n "$command_params" ]; then
-	echo "$todo_flag $command_params" >> "$todo_file"
+	echo -e "$todo_flag $command_params \t$(date +%H:%M:%S)" >> "$todo_file"
     else
 	usage
     fi
