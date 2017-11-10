@@ -7,10 +7,28 @@ todo_flag=' '
 done_flag='+'
 
 command_name="$1"
+command_params=""
+date_params=""
 if [ -n "$command_name" ]; then
     shift 1
 fi
+
+while getopts ":d:" opt; do
+    case $opt in
+	d )
+	    date_params=$(date -d "$OPTARG" +%Y-%m-%d)
+	    if [ -n "$temp_todo_file" ]; then
+		todo_file=""${todo_folder}/${date_params}.txt""
+	    fi
+	    ;;
+    esac
+done
+shift $(($OPTIND - 1))
 command_params="${@#$0}"
+echo $command_name
+echo $command_params
+echo $date_params
+echo $todo_file
 
 usage () {
     echo -en "  Usage: $0 "
@@ -39,14 +57,6 @@ echo_bold () {
     echo -en "\e[1m${@}\e[0m"
 }
 
-echo_red () {
-    echo -en "\e[91m${@}\e[0m"
-}
-
-echo_green () {
-    echo -en "\e[92m${@}\e[0m"
-}
-
 get_todo_folder () {
     if ! [ -d "$todo_folder" ]; then
 	mkdir -p "$todo_folder"
@@ -66,9 +76,11 @@ get_line_number () {
 
 ls_item () {
     local target_file="$todo_file"
-
-    if [ -n "$command_params" ]; then
-	target_file="$todo_folder/$(date -d "$command_params" +%Y-%m-%d).txt"
+    
+    if [ -z "$date_params" ]; then
+	if [ -n "$command_params" ]; then
+	    target_file="$todo_folder/$(date -d "$command_params" +%Y-%m-%d).txt"
+	fi
     fi
 
     if [ -f "$target_file" ]; then
