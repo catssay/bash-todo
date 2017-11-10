@@ -65,7 +65,13 @@ get_line_number () {
 }
 
 ls_item () {
-    if [ -f "$todo_file" ]; then
+    local target_file="$todo_file"
+
+    if [ -n "$command_params" ]; then
+	target_file="$todo_folder/$(date -d "$command_params" +%Y-%m-%d).txt"
+    fi
+
+    if [ -f "$target_file" ]; then
 	if [ -z "$(cat $todo_file)" ]; then
 	    exit 0
 	fi
