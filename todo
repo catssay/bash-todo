@@ -4,8 +4,10 @@ todo_flag=' '
 done_flag='+'
 todo_color='91'
 done_color='92'
+today_highlight_color='33'
 todo_file_fmt='%Y-%m-%d'
 todo_item_time_fmt='%H:%M'
+list_file_delimiter="\\n"
 todo_folder="${HOME}/.todo"
 todo_file="${todo_folder}/$(date +${todo_file_fmt}).txt"
 
@@ -29,20 +31,23 @@ command_params="${@#$0}"
 
 usage () {
     cat <<EOF | xargs -I{} echo -e {}
-Usage: $0 [COMMAND] [OPTIONS]
+Usage: $0 [ COMMAND ] [ OPTIONS ] [ PARAMETERS ]
 COMMANDS:
-\\\\t \\\e[1madd    | a\\\e[0m   \\\e[4mCONTENT\\\e[0m       add CONTENT to todo list.
-\\\\t \\\e[1mlist   | ls\\\e[0m  [ \\\e[4mDATE\\\e[0m ]      show DATE\'s todo list, default DATE is today.
+\\\\t \\\e[2mcommand      parameters\\\e[0m
+\\\\t \\\e[1madd    | a\\\e[0m   \\\e[4mCONTENT\\\e[0m       add CONTENT to todo file.
+\\\\t \\\e[1mlist   | ls\\\e[0m  [ \\\e[4mFILE\\\e[0m ]      show FILE\'s todo items, defaul is today\'s todo file.
 \\\\t \\\e[1mremove | rm\\\e[0m  [ \\\e[4mN\\\e[0m ] ...     remove todo item of line N, default is all lines.
 \\\\t \\\e[1mmark   | m\\\e[0m   [ \\\e[4mN\\\e[0m ] ...     mark todo item of line N as completed, default is all lines.
 \\\\t \\\e[1munmark | um\\\e[0m  [ \\\e[4mN\\\e[0m ] ...     mark todo itemof line N as uncompleted. default is all lines.
+\\\\t \\\e[1mls-file| sf\\\e[0m  [ \\\e[4mN\\\e[0m ]         show latest N todo files.
 
 OPTIONS:
 \\\\t -d  \\\e[4m DATE \\\e[0m  which day to be operated, default is today.
 DESCRIPTION:
-\\\\t \\\e[4mDATE\\\e[0m               DATE is like '"'today'"' '"'tomorrow'"' '"'last 2 days'"' '"'2017-11-11'"' etc,
-\\\\t """"""     """"""""              which can be recognized be GNU date program.
-\\\\t \\\e[4mN\\\e[0m                  N is a positive number.
+\\\\t \\\e[4mDATE\\\e[0m        DATE is like '"'today'"' '"'tomorrow'"' '"'last 2 days'"' '"'2017-11-11'"' etc,
+\\\\t """"""     """"""""       which can be recognized be GNU date program.
+\\\\t \\\e[4mN\\\e[0m           N is a positive number.
+\\\\t \\\e[4mFILE\\\e[0m        FILE is a filename of todo list files, just name with suffix without path name.
 EXAMPLES:
 \\\\t todo add 'go shopping'
 \\\\t todo add -d 'tomorrow' 'fix bugs'
@@ -52,6 +57,14 @@ EXAMPLES:
 \\\\t todo m -d 'last day' 2, 3
 \\\\t todo um -d '2017-11-11' 1
 EOF
+}
+
+echo_today_highlight () {
+    if [ -n "$today_highlight_color" ]; then
+	echo -en "\e[${today_highlight_color}m${@}\e[0m"
+    else
+	echo -en "$@"
+    fi
 }
 
 get_todo_folder () {
@@ -71,13 +84,40 @@ get_line_number () {
     echo "$command_params" |sed -rn '/^( *[1-9]+)((,? *| +)[1-9]+)* *$/p' |sed 's/,/ /g'
 }
 
-ls_item () {
-    local target_file="$todo_file"
-    if [ -f "$target_file" ]; then
-	if [ -z "$(cat $target_file)" ]; then
-	    exit 0
+trunc_array () {
+    local array=($1)
+    local newArr=()
+    for (( i=0; i<$2; i++)); do
+	newArr[${i}]=${array[${i}]}
+    done
+    echo -n "${newArr[*]}"
+}
+
+ls_file () {
+    local show_amount=$(echo $command_params |sed -rn '/^ *[0-9]+ *$/p')||0
+    if [ -z "$show_amount" ]; then show_amount=0; fi
+    if [ -d "$todo_folder" ]; then
+	local file_list=($(ls -Cr $todo_folder))
+	if [ $show_amount -gt 0 ]; then
+	    file_list=($(trunc_array "${file_list[*]}" $show_amount))
 	fi
-	cat "$target_file" | awk -f <(cat <<EOF
+	local filename
+        for filename in "${file_list[@]}"; do
+	    if [ "${filename%.txt}" = "$(date +${todo_file_fmt})" ]; then
+		echo_today_highlight "$filename${list_file_delimiter}"
+	    else
+		echo -en "$filename${list_file_delimiter}"
+	    fi
+	done
+	if [ $(echo -e "$list_file_delimiter" |awk "END { print NR }") -eq 1 ]; then
+	    echo
+	fi
+    fi
+}
+
+print_item () {
+    cat <<<"$@" |
+    awk -f <(cat <<EOF
 BEGAIN { done_count = 0; todo_count = 0 }
 {
   is_item_done = (\$0 ~ /^${done_flag}/)
@@ -90,11 +130,42 @@ BEGAIN { done_count = 0; todo_count = 0 }
   printf("%s%s  %s %s \n", color_str, NR, \$0, "\\033[0m")
 }
 END {
-  format = "- Todo: %d   - Done: %d"
+  format = ":todo %d   :done %d"
   printf(format, todo_count, done_count)
 }
 EOF
-) | xargs -I{} echo -e {}
+	    ) |
+    xargs -I{} echo -e {}
+}
+
+ls_item () {
+    local target_file="$todo_file"
+    if [ -n "$command_params" ]; then
+	local specific_file="${todo_folder}/$command_params"
+	if [ -f "$specific_file" ]; then
+	    target_file="$specific_file"
+	elif [ -f "${specific_file}.txt" ]; then
+	    echo -ne "Did you mean '${command_params}.txt'? [Y, N]: ";
+	    local choice
+	    read choice
+	    case "$choice" in
+		y | Y | yes | YES | Yes )
+		    target_file="${specific_file}.txt"
+		    ;;
+		* )
+		    exit 0
+		    ;;
+	    esac
+	else
+	    echo "File \"$command_params\" doesn't exist."
+	    exit 0
+	fi
+    fi
+    if [ -f "$target_file" ]; then
+	if [ -z "$(cat $target_file)" ]; then
+	    exit 0
+	fi
+	print_item "$(cat $target_file)"
     fi
 }
 
@@ -176,6 +247,15 @@ case "$command_name" in
 	;;
     um | unmark )
 	op_item unmark
+	;;
+    lf | ls-file )
+	ls_file
+	;;
+    sf | show-folder )
+	echo "$todo_folder"
+	;;
+    lt | ls-todo )
+	ls_todo
 	;;
     * )
 	usage
