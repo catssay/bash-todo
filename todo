@@ -139,6 +139,7 @@ EOF
 }
 
 ls_item () {
+    local is_other_ls=$(( $1 + 0))
     local target_file="$todo_file"
     if [ -n "$command_params" ]; then
 	local specific_file="${todo_folder}/$command_params"
@@ -156,7 +157,7 @@ ls_item () {
 		    exit 0
 		    ;;
 	    esac
-	else
+	elif [ $is_other_ls -eq 0 ]; then
 	    echo "File \"$command_params\" doesn't exist."
 	    exit 0
 	fi
@@ -224,7 +225,7 @@ op_item () {
     else
 	echo -e "$content" > "$todo_file"
     fi
-    ls_item
+    ls_item 1
 }
 
 if [ -z "$command_name" ]; then
