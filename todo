@@ -1,9 +1,11 @@
 #!/bin/bash -e
 
-todo_folder="${HOME}/.todo"
-todo_file="${todo_folder}/`date +%Y-%m-%d`.txt"
 todo_flag=' '
 done_flag='+'
+todo_file_fmt='%Y-%m-%d'
+todo_item_time_fmt='%H:%M'
+todo_folder="${HOME}/.todo"
+todo_file="${todo_folder}/$(date +${todo_file_fmt}).txt"
 
 command_name="$1"
 date_params=""
@@ -13,7 +15,7 @@ fi
 while getopts ":d:" opt; do
     case $opt in
 	d )
-	    date_params=$(date -d "$OPTARG" +%Y-%m-%d)
+	    date_params=$(date -d "$OPTARG" +${todo_file_fmt})
 	    if [ -n "$date_params" ]; then
 		todo_file=""${todo_folder}/${date_params}.txt""
 	    fi
@@ -29,9 +31,9 @@ Usage: $0 [COMMAND] [OPTIONS]
 COMMANDS:
 \\\\t \\\e[1madd    | a\\\e[0m   \\\e[4mCONTENT\\\e[0m       add CONTENT to todo list.
 \\\\t \\\e[1mlist   | ls\\\e[0m  [ \\\e[4mDATE\\\e[0m ]      show DATE\'s todo list, default DATE is today.
-\\\\t \\\e[1mremove | rm\\\e[0m  [ \\\e[4mN\\\e[0m ]         remove todo item of line N, default is all lines.
-\\\\t \\\e[1mmark   | m\\\e[0m   [ \\\e[4mN\\\e[0m ]         mark todo item of line N as completed, default is all lines.
-\\\\t \\\e[1munmark | um\\\e[0m  [ \\\e[4mN\\\e[0m ]         mark todo itemof line N as uncompleted. default is all lines.
+\\\\t \\\e[1mremove | rm\\\e[0m  [ \\\e[4mN\\\e[0m ] ...     remove todo item of line N, default is all lines.
+\\\\t \\\e[1mmark   | m\\\e[0m   [ \\\e[4mN\\\e[0m ] ...     mark todo item of line N as completed, default is all lines.
+\\\\t \\\e[1munmark | um\\\e[0m  [ \\\e[4mN\\\e[0m ] ...     mark todo itemof line N as uncompleted. default is all lines.
 
 OPTIONS:
 \\\\t -d  \\\e[4m DATE \\\e[0m  which day to be operated, default is today.
@@ -45,8 +47,8 @@ EXAMPLES:
 \\\\t todo ls
 \\\\t todo ls -d 'last 2 days'
 \\\\t todo rm 2
-\\\\t todo m -d 'last day' 2
-\\\\t todo um -d 'last day' 1
+\\\\t todo m -d 'last day' 2, 3
+\\\\t todo um -d '2017-11-11' 1
 EOF
 }
 
@@ -64,14 +66,14 @@ get_todo_file () {
 }
 
 get_line_number () {
-    echo "$command_params" |sed -rn '/^ *[1-9]+ *$/p'
+    echo "$command_params" |sed -rn '/^( *[1-9]+)((,? *| +)[1-9]+)* *$/p' |sed 's/,/ /g'
 }
 
 ls_item () {
     local target_file="$todo_file"
     if [ -z "$date_params" ]; then
 	if [ -n "$command_params" ]; then
-	    target_file="$todo_folder/$(date -d "$command_params" +%Y-%m-%d).txt"
+	    target_file="$todo_folder/$(date -d "$command_params" +${todo_file_fmt}).txt"
 	fi
     fi
     if [ -f "$target_file" ]; then
@@ -92,7 +94,7 @@ else \
 add_item () {
     get_todo_file
     if [ -n "$command_params" ]; then
-	echo -e "$todo_flag $command_params \t$(date +%H:%M:%S)" >> "$todo_file"
+	echo -e "$todo_flag $command_params \t$(date +${todo_item_time_fmt})" >> "$todo_file"
     else
 	usage
     fi
@@ -100,29 +102,30 @@ add_item () {
 
 op_item () {
     get_todo_file
-    local line_number=$(get_line_number)
+    local line_number_array=$(get_line_number)
     if [ -z "$command_params" ]; then
-	line_number=""
+	line_number_array=()
     else
-	if [ -z "$line_number" ]; then
+	if [ -z "${line_number_array[*]}" ]; then
 	    usage
 	fi
     fi
     local content
+    local sed_line_numbers=$(echo ${line_number_array[*]} |sed -r 's/ +/,/g')
     case "$1" in
 	mark )
-	    content=$(sed -r "${line_number}s/^${todo_flag}/${done_flag}/" $todo_file)
+	    content=$(sed -r "${sed_line_numbers}s/^${todo_flag}/${done_flag}/" $todo_file)
 	    ;;
-	rm )
-	    content=$(sed "${line_number}d" $todo_file)
+	remove )
+	    content=$(sed "${sed_line_numbers}d" $todo_file)
 	    ;;
 	unmark )
-	    content=$(sed -r "${line_number}s/^\\${done_flag}/${todo_flag}/" $todo_file)
+	    content=$(sed -r "${sed_line_numbers}s/^\\${done_flag}/${todo_flag}/" $todo_file)
 	    ;;
 	* )
 	    usage
     esac
-    if [ -z "$line_number" ]; then
+    if [ -z "${line_number_array[*]}" ]; then
 	ls_item
 	echo -ne "Are you really want to $1 all todo items ? [Y, N]: "
 	local choice_action
@@ -130,7 +133,6 @@ op_item () {
 	case "$choice_action" in
 	    Y | y | Yes | YES | yes )
 		echo -e "$content" > "$todo_file"
-		ls_item
 		;;
 	    N | n | No | NO | * )
 		exit 0
@@ -139,6 +141,7 @@ op_item () {
     else
 	echo -e "$content" > "$todo_file"
     fi
+    ls_item
 }
 
 if [ -z "$command_name" ]; then
@@ -154,7 +157,7 @@ case "$command_name" in
 	ls_item
 	;;
     rm | remove)
-	op_item rm
+	op_item remove
 	;;
     m | mark )
 	op_item mark
