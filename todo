@@ -25,13 +25,13 @@ command_params="${@#$0}"
 
 usage () {
     cat <<EOF | xargs -I{} echo -e {}
-Usage: $0 [COMMAND]
+Usage: $0 [COMMAND] [OPTIONS]
 COMMANDS:
-\\\\t add    | a   [ OPTIONS ] \\\e[4mCONTENT\\\e[0m  add CONTENT to todo list.
-\\\\t list   | ls  [ \\\e[4mDATE\\\e[0m ]             show DATE\'s todo list, default DATE is today.
-\\\\t remove | rm  [ \\\e[4mN\\\e[0m ]                remove todo item of line N, default is all lines.
-\\\\t mark   | m   [ \\\e[4mN\\\e[0m ]                mark todo item of line N as completed, default is all lines.
-\\\\t unmark | um  [ \\\e[4mN\\\e[0m ]                mark todo itemof line N as uncompleted. default is all lines.
+\\\\t \\\e[1madd    | a\\\e[0m   \\\e[4mCONTENT\\\e[0m       add CONTENT to todo list.
+\\\\t \\\e[1mlist   | ls\\\e[0m  [ \\\e[4mDATE\\\e[0m ]      show DATE\'s todo list, default DATE is today.
+\\\\t \\\e[1mremove | rm\\\e[0m  [ \\\e[4mN\\\e[0m ]         remove todo item of line N, default is all lines.
+\\\\t \\\e[1mmark   | m\\\e[0m   [ \\\e[4mN\\\e[0m ]         mark todo item of line N as completed, default is all lines.
+\\\\t \\\e[1munmark | um\\\e[0m  [ \\\e[4mN\\\e[0m ]         mark todo itemof line N as uncompleted. default is all lines.
 
 OPTIONS:
 \\\\t -d  \\\e[4m DATE \\\e[0m  which day to be operated, default is today.
@@ -39,7 +39,14 @@ DESCRIPTION:
 \\\\t \\\e[4mDATE\\\e[0m               DATE is like '"'today'"' '"'tomorrow'"' '"'last 2 days'"' '"'2017-11-11'"' etc,
 \\\\t """"""     """"""""              which can be recognized be GNU date program.
 \\\\t \\\e[4mN\\\e[0m                  N is a positive number.
-\\\\\n
+EXAMPLES:
+\\\\t todo add 'go shopping'
+\\\\t todo add -d 'tomorrow' 'fix bugs'
+\\\\t todo ls
+\\\\t todo ls -d 'last 2 days'
+\\\\t todo rm 2
+\\\\t todo m -d 'last day' 2
+\\\\t todo um -d 'last day' 1
 EOF
 }
 
