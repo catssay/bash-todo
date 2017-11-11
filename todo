@@ -2,6 +2,8 @@
 
 todo_flag=' '
 done_flag='+'
+todo_color='91'
+done_color='92'
 todo_file_fmt='%Y-%m-%d'
 todo_item_time_fmt='%H:%M'
 todo_folder="${HOME}/.todo"
@@ -71,30 +73,40 @@ get_line_number () {
 
 ls_item () {
     local target_file="$todo_file"
-    if [ -z "$date_params" ]; then
-	if [ -n "$command_params" ]; then
-	    target_file="$todo_folder/$(date -d "$command_params" +${todo_file_fmt}).txt"
-	fi
-    fi
     if [ -f "$target_file" ]; then
 	if [ -z "$(cat $target_file)" ]; then
 	    exit 0
 	fi
-	cat "$target_file" | awk -- " \
-{ \
-if (\$1 == \"${done_flag}\")
-  print \"\\033[92m\", NR, \$0, \"\\033[0m\" ;\
-else \
-  print \"\\033[91m\", NR, \$0, \"\\033[0m\"; \
-} \
-" | xargs -I{} echo -e {}
+	cat "$target_file" | awk -f <(cat <<EOF
+BEGAIN { done_count = 0; todo_count = 0 }
+{
+  is_item_done = (\$0 ~ /^${done_flag}/)
+  line_color = is_item_done ? "$done_color" : "$todo_color"
+
+  if (is_item_done) done_count += 1
+  else todo_count += 1
+
+  color_str = line_color ? "\\033[" line_color "m" : ""
+  printf("%s%s  %s %s \n", color_str, NR, \$0, "\\033[0m")
+}
+END {
+  format = "- Todo: %d   - Done: %d"
+  printf(format, todo_count, done_count)
+}
+EOF
+) | xargs -I{} echo -e {}
     fi
 }
 
 add_item () {
     get_todo_file
+    local content="$todo_flag $command_params"
     if [ -n "$command_params" ]; then
-	echo -e "$todo_flag $command_params \t$(date +${todo_item_time_fmt})" >> "$todo_file"
+	if [ -z "$(cat $todo_file)" ]; then
+	    echo -e "$content" > "$todo_file"
+	else
+	    echo -e "$content" >> "$todo_file"
+	fi
     else
 	usage
     fi
